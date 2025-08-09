@@ -1,0 +1,182 @@
+@page "/balance"
+@using WarehouseManagement.Shared.Models
+@using WarehouseManagement.Shared.DTOs
+@using WarehouseManagement.Client.Services
+@using BalanceModel = WarehouseManagement.Shared.Models.Balance
+@inject ApiService ApiService
+
+<PageTitle>Склад - Баланс</PageTitle>
+
+<h1 class="mb-4">Баланс склада</h1>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Фильтры</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Ресурсы:</label>
+                    <select class="form-select" @onchange="OnResourceFilterChanged" multiple>
+                        @foreach (var resource in Resources)
+                        {
+                            <option value="@resource.Id">@resource.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Единицы измерения:</label>
+                    <select class="form-select" @onchange="OnUnitFilterChanged" multiple>
+                        @foreach (var unit in UnitsOfMeasurement)
+                        {
+                            <option value="@unit.Id">@unit.Name</option>
+                        }
+                    </select>
+                </div>
+                <button class="btn btn-primary" @onclick="ApplyFilters">Применить фильтры</button>
+                <button class="btn btn-secondary ms-2" @onclick="ClearFilters">Очистить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+}
+else if (ErrorMessage != null)
+{
+    <div class="alert alert-danger">
+        @ErrorMessage
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Ресурс</th>
+                    <th>Единица измерения</th>
+                    <th>Количество</th>
+                    <th>Последнее обновление</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (BalanceItems.Any())
+                {
+                    @foreach (var item in BalanceItems)
+                    {
+                        <tr>
+                            <td>@item.Resource.Name</td>
+                            <td>@item.UnitOfMeasurement.Name</td>
+                            <td class="text-end">@item.Quantity.ToString("N2")</td>
+                            <td>@item.UpdatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">Нет данных для отображения</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<BalanceModel> BalanceItems = new();
+    private List<Resource> Resources = new();
+    private List<UnitOfMeasurement> UnitsOfMeasurement = new();
+    private List<int> SelectedResourceIds = new();
+    private List<int> SelectedUnitIds = new();
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+
+            var tasks = new[]
+            {
+                LoadResources(),
+                LoadUnitsOfMeasurement(),
+                LoadBalance()
+            };
+
+            await Task.WhenAll(tasks);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка загрузки данных: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadResources()
+    {
+        Resources = (await ApiService.GetActiveResourcesAsync()).ToList();
+    }
+
+    private async Task LoadUnitsOfMeasurement()
+    {
+        UnitsOfMeasurement = (await ApiService.GetActiveUnitsOfMeasurementAsync()).ToList();
+    }
+
+    private async Task LoadBalance()
+    {
+        var filter = new BalanceFilterDto
+        {
+            ResourceIds = SelectedResourceIds,
+            UnitOfMeasurementIds = SelectedUnitIds
+        };
+
+        BalanceItems = (await ApiService.GetBalanceAsync(filter)).ToList();
+    }
+
+    private void OnResourceFilterChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string[] selectedValues)
+        {
+            SelectedResourceIds = selectedValues.Select(int.Parse).ToList();
+        }
+    }
+
+    private void OnUnitFilterChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string[] selectedValues)
+        {
+            SelectedUnitIds = selectedValues.Select(int.Parse).ToList();
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        await LoadBalance();
+    }
+
+    private async Task ClearFilters()
+    {
+        SelectedResourceIds.Clear();
+        SelectedUnitIds.Clear();
+        await LoadBalance();
+    }
+}

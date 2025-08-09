@@ -1,0 +1,242 @@
+@page "/resources"
+@using WarehouseManagement.Shared.Models
+@using WarehouseManagement.Shared.Enums
+@using WarehouseManagement.Client.Services
+@inject ApiService ApiService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Ресурсы</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Ресурсы</h1>
+    <button class="btn btn-primary" @onclick="ShowCreateModal">
+        <i class="bi bi-plus-circle"></i> Добавить ресурс
+    </button>
+</div>
+
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+}
+else if (ErrorMessage != null)
+{
+    <div class="alert alert-danger">
+        @ErrorMessage
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Наименование</th>
+                    <th>Состояние</th>
+                    <th>Дата создания</th>
+                    <th>Дата обновления</th>
+                    <th width="200">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (ResourcesList.Any())
+                {
+                    @foreach (var resource in ResourcesList)
+                    {
+                        <tr>
+                            <td>@resource.Name</td>
+                            <td>
+                                <span class="badge @(resource.State == EntityState.Active ? "bg-success" : "bg-secondary")">
+                                    @(resource.State == EntityState.Active ? "Активный" : "В архиве")
+                                </span>
+                            </td>
+                            <td>@resource.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>@resource.UpdatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(resource)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    @if (resource.State == EntityState.Active)
+                                    {
+                                        <button class="btn btn-outline-warning" @onclick="() => ArchiveResource(resource.Id)">
+                                            <i class="bi bi-archive"></i>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-outline-info" @onclick="() => RestoreResource(resource.Id)">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    }
+                                    <button class="btn btn-outline-danger" @onclick="() => DeleteResource(resource.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Нет данных для отображения</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- Modal -->
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(IsEditMode ? "Редактировать ресурс" : "Добавить ресурс")</h5>
+                    <button type="button" class="btn-close" @onclick="HideModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Наименование *</label>
+                        <input type="text" class="form-control" @bind="CurrentResource.Name" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Отмена</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveResource" disabled="@(string.IsNullOrWhiteSpace(CurrentResource.Name))">
+                        Сохранить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Resource> ResourcesList = new();
+    private Resource CurrentResource = new();
+    private bool IsLoading = true;
+    private bool ShowModal = false;
+    private bool IsEditMode = false;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadResources();
+    }
+
+    private async Task LoadResources()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+            ResourcesList = (await ApiService.GetResourcesAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка загрузки ресурсов: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ShowCreateModal()
+    {
+        CurrentResource = new Resource();
+        IsEditMode = false;
+        ShowModal = true;
+    }
+
+    private void ShowEditModal(Resource resource)
+    {
+        CurrentResource = new Resource
+        {
+            Id = resource.Id,
+            Name = resource.Name,
+            State = resource.State,
+            CreatedAt = resource.CreatedAt,
+            UpdatedAt = resource.UpdatedAt
+        };
+        IsEditMode = true;
+        ShowModal = true;
+    }
+
+    private void HideModal()
+    {
+        ShowModal = false;
+        CurrentResource = new Resource();
+    }
+
+    private async Task SaveResource()
+    {
+        try
+        {
+            if (IsEditMode)
+            {
+                await ApiService.UpdateResourceAsync(CurrentResource);
+            }
+            else
+            {
+                await ApiService.CreateResourceAsync(CurrentResource);
+            }
+
+            HideModal();
+            await LoadResources();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка сохранения: {ex.Message}";
+        }
+    }
+
+    private async Task ArchiveResource(int id)
+    {
+        try
+        {
+            await ApiService.ArchiveResourceAsync(id);
+            await LoadResources();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка архивирования: {ex.Message}";
+        }
+    }
+
+    private async Task RestoreResource(int id)
+    {
+        try
+        {
+            await ApiService.RestoreResourceAsync(id);
+            await LoadResources();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка восстановления: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteResource(int id)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Вы уверены, что хотите удалить этот ресурс?"))
+        {
+            try
+            {
+                await ApiService.DeleteResourceAsync(id);
+                await LoadResources();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Ошибка удаления: {ex.Message}";
+            }
+        }
+    }
+}
