@@ -1,0 +1,242 @@
+@page "/units"
+@using WarehouseManagement.Shared.Models
+@using WarehouseManagement.Shared.Enums
+@using WarehouseManagement.Client.Services
+@inject ApiService ApiService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Единицы измерения</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Единицы измерения</h1>
+    <button class="btn btn-primary" @onclick="ShowCreateModal">
+        <i class="bi bi-plus-circle"></i> Добавить единицу измерения
+    </button>
+</div>
+
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+}
+else if (ErrorMessage != null)
+{
+    <div class="alert alert-danger">
+        @ErrorMessage
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Наименование</th>
+                    <th>Состояние</th>
+                    <th>Дата создания</th>
+                    <th>Дата обновления</th>
+                    <th width="200">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (UnitsList.Any())
+                {
+                    @foreach (var unit in UnitsList)
+                    {
+                        <tr>
+                            <td>@unit.Name</td>
+                            <td>
+                                <span class="badge @(unit.State == EntityState.Active ? "bg-success" : "bg-secondary")">
+                                    @(unit.State == EntityState.Active ? "Активный" : "В архиве")
+                                </span>
+                            </td>
+                            <td>@unit.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>@unit.UpdatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(unit)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    @if (unit.State == EntityState.Active)
+                                    {
+                                        <button class="btn btn-outline-warning" @onclick="() => ArchiveUnit(unit.Id)">
+                                            <i class="bi bi-archive"></i>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-outline-info" @onclick="() => RestoreUnit(unit.Id)">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    }
+                                    <button class="btn btn-outline-danger" @onclick="() => DeleteUnit(unit.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Нет данных для отображения</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- Modal -->
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(IsEditMode ? "Редактировать единицу измерения" : "Добавить единицу измерения")</h5>
+                    <button type="button" class="btn-close" @onclick="HideModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Наименование *</label>
+                        <input type="text" class="form-control" @bind="CurrentUnit.Name" placeholder="кг, м, шт, л..." />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Отмена</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveUnit" disabled="@(string.IsNullOrWhiteSpace(CurrentUnit.Name))">
+                        Сохранить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<UnitOfMeasurement> UnitsList = new();
+    private UnitOfMeasurement CurrentUnit = new();
+    private bool IsLoading = true;
+    private bool ShowModal = false;
+    private bool IsEditMode = false;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUnits();
+    }
+
+    private async Task LoadUnits()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+            UnitsList = (await ApiService.GetUnitsOfMeasurementAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка загрузки единиц измерения: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ShowCreateModal()
+    {
+        CurrentUnit = new UnitOfMeasurement();
+        IsEditMode = false;
+        ShowModal = true;
+    }
+
+    private void ShowEditModal(UnitOfMeasurement unit)
+    {
+        CurrentUnit = new UnitOfMeasurement
+        {
+            Id = unit.Id,
+            Name = unit.Name,
+            State = unit.State,
+            CreatedAt = unit.CreatedAt,
+            UpdatedAt = unit.UpdatedAt
+        };
+        IsEditMode = true;
+        ShowModal = true;
+    }
+
+    private void HideModal()
+    {
+        ShowModal = false;
+        CurrentUnit = new UnitOfMeasurement();
+    }
+
+    private async Task SaveUnit()
+    {
+        try
+        {
+            if (IsEditMode)
+            {
+                await ApiService.UpdateUnitOfMeasurementAsync(CurrentUnit);
+            }
+            else
+            {
+                await ApiService.CreateUnitOfMeasurementAsync(CurrentUnit);
+            }
+
+            HideModal();
+            await LoadUnits();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка сохранения: {ex.Message}";
+        }
+    }
+
+    private async Task ArchiveUnit(int id)
+    {
+        try
+        {
+            await ApiService.ArchiveUnitOfMeasurementAsync(id);
+            await LoadUnits();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка архивирования: {ex.Message}";
+        }
+    }
+
+    private async Task RestoreUnit(int id)
+    {
+        try
+        {
+            await ApiService.RestoreUnitOfMeasurementAsync(id);
+            await LoadUnits();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка восстановления: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteUnit(int id)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Вы уверены, что хотите удалить эту единицу измерения?"))
+        {
+            try
+            {
+                await ApiService.DeleteUnitOfMeasurementAsync(id);
+                await LoadUnits();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Ошибка удаления: {ex.Message}";
+            }
+        }
+    }
+}

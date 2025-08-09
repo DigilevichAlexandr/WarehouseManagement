@@ -20,7 +20,7 @@ namespace WarehouseManagement.Shared.Models
         /// <summary>
         /// Ресурс
         /// </summary>
-        public Resource Resource { get; set; } = null!;
+        public Resource? Resource { get; set; }
         
         /// <summary>
         /// Идентификатор единицы измерения
@@ -30,7 +30,7 @@ namespace WarehouseManagement.Shared.Models
         /// <summary>
         /// Единица измерения
         /// </summary>
-        public UnitOfMeasurement UnitOfMeasurement { get; set; } = null!;
+        public UnitOfMeasurement? UnitOfMeasurement { get; set; }
         
         /// <summary>
         /// Количество

@@ -1,7 +1,289 @@
 ﻿@page "/"
+@using WarehouseManagement.Shared.Models
+@using WarehouseManagement.Shared.Enums
+@using WarehouseManagement.Client.Services
+@using BalanceModel = WarehouseManagement.Shared.Models.Balance
+@inject ApiService ApiService
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Главная - Управление складом</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-4">Система управления складом</h1>
+        <p class="lead">Добро пожаловать в систему автоматизации складских операций</p>
+    </div>
+</div>
 
-Welcome to your new app.
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Загрузка статистики...</span>
+        </div>
+    </div>
+}
+else if (ErrorMessage != null)
+{
+    <div class="alert alert-danger">
+        @ErrorMessage
+    </div>
+}
+else
+{
+    <!-- Статистические карточки -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Всего ресурсов
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">@TotalResources</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-gear-fill fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Позиций на складе
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">@TotalBalancePositions</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-box-seam-fill fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Документов поступления
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">@TotalReceiptDocuments</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-arrow-down-square-fill fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Документов отгрузки
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">@TotalShipmentDocuments</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-arrow-up-square-fill fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Быстрые действия -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Быстрые действия</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <a href="/balance" class="btn btn-outline-primary btn-block">
+                                <i class="bi bi-box-seam"></i> Склад
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="/receipts" class="btn btn-outline-success btn-block">
+                                <i class="bi bi-arrow-down-square"></i> Поступления
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="/shipments" class="btn btn-outline-warning btn-block">
+                                <i class="bi bi-arrow-up-square"></i> Отгрузки
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="/resources" class="btn btn-outline-info btn-block">
+                                <i class="bi bi-gear"></i> Ресурсы
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Последние остатки на складе -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Текущие остатки на складе</h6>
+                    <a href="/balance" class="btn btn-sm btn-primary">Все остатки</a>
+                </div>
+                <div class="card-body">
+                    @if (RecentBalance.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Ресурс</th>
+                                        <th>Единица измерения</th>
+                                        <th>Количество</th>
+                                        <th>Последнее обновление</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in RecentBalance.Take(10))
+                                    {
+                                        <tr>
+                                            <td>@(item.Resource?.Name ?? "Неизвестный ресурс")</td>
+                                            <td>@(item.UnitOfMeasurement?.Name ?? "Неизвестная единица")</td>
+                                            <td class="text-end">
+                                                <span class="badge @(item.Quantity > 0 ? "bg-success" : "bg-danger")">
+                                                    @item.Quantity.ToString("N2")
+                                                </span>
+                                            </td>
+                                            <td>@item.UpdatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-inbox fa-3x"></i>
+                            <p class="mt-2">Нет остатков на складе</p>
+                            <a href="/receipts" class="btn btn-primary">Создать документ поступления</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .border-left-primary {
+        border-left: 0.25rem solid #4e73df !important;
+    }
+    .border-left-success {
+        border-left: 0.25rem solid #1cc88a !important;
+    }
+    .border-left-info {
+        border-left: 0.25rem solid #36b9cc !important;
+    }
+    .border-left-warning {
+        border-left: 0.25rem solid #f6c23e !important;
+    }
+    .text-gray-800 {
+        color: #5a5c69 !important;
+    }
+    .text-gray-300 {
+        color: #dddfeb !important;
+    }
+    .fa-2x {
+        font-size: 2em;
+    }
+    .fa-3x {
+        font-size: 3em;
+    }
+</style>
+
+@code {
+    private int TotalResources = 0;
+    private int TotalBalancePositions = 0;
+    private int TotalReceiptDocuments = 0;
+    private int TotalShipmentDocuments = 0;
+    private List<BalanceModel> RecentBalance = new();
+    private bool IsLoading = true;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatistics();
+    }
+
+    private async Task LoadStatistics()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+
+            // Загружаем статистику параллельно
+            var statisticsTasks = new[]
+            {
+                LoadResourcesCount(),
+                LoadBalanceData(),
+                LoadReceiptDocumentsCount(),
+                LoadShipmentDocumentsCount()
+            };
+
+            await Task.WhenAll(statisticsTasks);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка загрузки статистики: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadResourcesCount()
+    {
+        var resources = await ApiService.GetResourcesAsync();
+        TotalResources = resources.Count();
+    }
+
+    private async Task LoadBalanceData()
+    {
+        var balance = await ApiService.GetBalanceAsync();
+        RecentBalance = balance.OrderByDescending(b => b.UpdatedAt).ToList();
+        TotalBalancePositions = balance.Count();
+    }
+
+    private async Task LoadReceiptDocumentsCount()
+    {
+        var documents = await ApiService.GetReceiptDocumentsAsync();
+        TotalReceiptDocuments = documents.Count();
+    }
+
+    private async Task LoadShipmentDocumentsCount()
+    {
+        var documents = await ApiService.GetShipmentDocumentsAsync();
+        TotalShipmentDocuments = documents.Count();
+    }
+}

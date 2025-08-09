@@ -26,7 +26,9 @@ namespace WarehouseManagement.Server.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                // Log the exception for debugging
+                Console.WriteLine($"Error in GetShipmentDocuments: {ex}");
+                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
             }
         }
 

@@ -28,7 +28,7 @@ namespace WarehouseManagement.Shared.Models
         /// <summary>
         /// Клиент
         /// </summary>
-        public Client Client { get; set; } = null!;
+        public Client? Client { get; set; }
         
         /// <summary>
         /// Дата документа

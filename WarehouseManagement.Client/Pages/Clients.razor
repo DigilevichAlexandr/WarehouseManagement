@@ -1,0 +1,250 @@
+@page "/clients"
+@using WarehouseManagement.Shared.Models
+@using WarehouseManagement.Shared.Enums
+@using WarehouseManagement.Client.Services
+@using ClientModel = WarehouseManagement.Shared.Models.Client
+@inject ApiService ApiService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Клиенты</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Клиенты</h1>
+    <button class="btn btn-primary" @onclick="ShowCreateModal">
+        <i class="bi bi-plus-circle"></i> Добавить клиента
+    </button>
+</div>
+
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+}
+else if (ErrorMessage != null)
+{
+    <div class="alert alert-danger">
+        @ErrorMessage
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Наименование</th>
+                    <th>Адрес</th>
+                    <th>Состояние</th>
+                    <th>Дата создания</th>
+                    <th>Дата обновления</th>
+                    <th width="200">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (ClientsList.Any())
+                {
+                    @foreach (var client in ClientsList)
+                    {
+                        <tr>
+                            <td>@client.Name</td>
+                            <td>@client.Address</td>
+                            <td>
+                                <span class="badge @(client.State == EntityState.Active ? "bg-success" : "bg-secondary")">
+                                    @(client.State == EntityState.Active ? "Активный" : "В архиве")
+                                </span>
+                            </td>
+                            <td>@client.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>@client.UpdatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(client)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    @if (client.State == EntityState.Active)
+                                    {
+                                        <button class="btn btn-outline-warning" @onclick="() => ArchiveClient(client.Id)">
+                                            <i class="bi bi-archive"></i>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-outline-info" @onclick="() => RestoreClient(client.Id)">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                    }
+                                    <button class="btn btn-outline-danger" @onclick="() => DeleteClient(client.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">Нет данных для отображения</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- Modal -->
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(IsEditMode ? "Редактировать клиента" : "Добавить клиента")</h5>
+                    <button type="button" class="btn-close" @onclick="HideModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Наименование *</label>
+                        <input type="text" class="form-control" @bind="CurrentClient.Name" placeholder="ООО \"Компания\", ИП Иванов А.А." />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Адрес</label>
+                        <textarea class="form-control" rows="3" @bind="CurrentClient.Address" placeholder="г. Москва, ул. Ленина, д. 1"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Отмена</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveClient" disabled="@(string.IsNullOrWhiteSpace(CurrentClient.Name))">
+                        Сохранить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ClientModel> ClientsList = new();
+    private ClientModel CurrentClient = new();
+    private bool IsLoading = true;
+    private bool ShowModal = false;
+    private bool IsEditMode = false;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClients();
+    }
+
+    private async Task LoadClients()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+            ClientsList = (await ApiService.GetClientsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка загрузки клиентов: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ShowCreateModal()
+    {
+        CurrentClient = new ClientModel();
+        IsEditMode = false;
+        ShowModal = true;
+    }
+
+    private void ShowEditModal(ClientModel client)
+    {
+        CurrentClient = new ClientModel
+        {
+            Id = client.Id,
+            Name = client.Name,
+            Address = client.Address,
+            State = client.State,
+            CreatedAt = client.CreatedAt,
+            UpdatedAt = client.UpdatedAt
+        };
+        IsEditMode = true;
+        ShowModal = true;
+    }
+
+    private void HideModal()
+    {
+        ShowModal = false;
+        CurrentClient = new ClientModel();
+    }
+
+    private async Task SaveClient()
+    {
+        try
+        {
+            if (IsEditMode)
+            {
+                await ApiService.UpdateClientAsync(CurrentClient);
+            }
+            else
+            {
+                await ApiService.CreateClientAsync(CurrentClient);
+            }
+
+            HideModal();
+            await LoadClients();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка сохранения: {ex.Message}";
+        }
+    }
+
+    private async Task ArchiveClient(int id)
+    {
+        try
+        {
+            await ApiService.ArchiveClientAsync(id);
+            await LoadClients();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка архивирования: {ex.Message}";
+        }
+    }
+
+    private async Task RestoreClient(int id)
+    {
+        try
+        {
+            await ApiService.RestoreClientAsync(id);
+            await LoadClients();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка восстановления: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteClient(int id)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Вы уверены, что хотите удалить этого клиента?"))
+        {
+            try
+            {
+                await ApiService.DeleteClientAsync(id);
+                await LoadClients();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Ошибка удаления: {ex.Message}";
+            }
+        }
+    }
+}

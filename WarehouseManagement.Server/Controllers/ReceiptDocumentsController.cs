@@ -16,6 +16,12 @@ namespace WarehouseManagement.Server.Controllers
             _warehouseService = warehouseService;
         }
 
+        [HttpGet("test")]
+        public IActionResult TestEndpoint()
+        {
+            return Ok(new { message = "Receipt documents API is working", timestamp = DateTime.UtcNow });
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ReceiptDocument>>> GetReceiptDocuments([FromQuery] DocumentFilterDto? filter = null)
         {
@@ -26,7 +32,9 @@ namespace WarehouseManagement.Server.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                // Log the exception for debugging
+                Console.WriteLine($"Error in GetReceiptDocuments: {ex}");
+                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
             }
         }
 

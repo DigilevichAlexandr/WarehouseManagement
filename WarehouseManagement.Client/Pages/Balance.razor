@@ -73,8 +73,8 @@ else
                     @foreach (var item in BalanceItems)
                     {
                         <tr>
-                            <td>@item.Resource.Name</td>
-                            <td>@item.UnitOfMeasurement.Name</td>
+                            <td>@(item.Resource?.Name ?? "Неизвестный ресурс")</td>
+                            <td>@(item.UnitOfMeasurement?.Name ?? "Неизвестная единица")</td>
                             <td class="text-end">@item.Quantity.ToString("N2")</td>
                             <td>@item.UpdatedAt.ToString("dd.MM.yyyy HH:mm")</td>
                         </tr>

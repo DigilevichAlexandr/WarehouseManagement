@@ -20,7 +20,7 @@ namespace WarehouseManagement.Shared.Models
         /// <summary>
         /// Документ отгрузки
         /// </summary>
-        public ShipmentDocument ShipmentDocument { get; set; } = null!;
+        public ShipmentDocument? ShipmentDocument { get; set; }
         
         /// <summary>
         /// Идентификатор ресурса
@@ -30,7 +30,7 @@ namespace WarehouseManagement.Shared.Models
         /// <summary>
         /// Ресурс
         /// </summary>
-        public Resource Resource { get; set; } = null!;
+        public Resource? Resource { get; set; }
         
         /// <summary>
         /// Идентификатор единицы измерения
@@ -40,7 +40,7 @@ namespace WarehouseManagement.Shared.Models
         /// <summary>
         /// Единица измерения
         /// </summary>
-        public UnitOfMeasurement UnitOfMeasurement { get; set; } = null!;
+        public UnitOfMeasurement? UnitOfMeasurement { get; set; }
         
         /// <summary>
         /// Количество

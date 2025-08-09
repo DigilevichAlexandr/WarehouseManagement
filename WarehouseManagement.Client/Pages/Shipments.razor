@@ -1,0 +1,636 @@
+@page "/shipments"
+@using WarehouseManagement.Shared.Models
+@using WarehouseManagement.Shared.DTOs
+@using WarehouseManagement.Shared.Enums
+@using WarehouseManagement.Client.Services
+@using ClientModel = WarehouseManagement.Shared.Models.Client
+@inject ApiService ApiService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Отгрузки</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Документы отгрузки</h1>
+    <button class="btn btn-primary" @onclick="ShowCreateModal">
+        <i class="bi bi-plus-circle"></i> Создать документ отгрузки
+    </button>
+</div>
+
+<!-- Фильтры -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <button class="btn btn-link p-0" type="button" @onclick="ToggleFilters">
+                        <i class="bi @(ShowFilters ? "bi-chevron-down" : "bi-chevron-right")"></i>
+                        Фильтры
+                    </button>
+                </h5>
+            </div>
+            @if (ShowFilters)
+            {
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">Дата с:</label>
+                            <input type="date" class="form-control" @bind="Filter.DateFrom" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Дата по:</label>
+                            <input type="date" class="form-control" @bind="Filter.DateTo" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Номера документов:</label>
+                            <select class="form-select" multiple>
+                                @foreach (var doc in AllDocuments)
+                                {
+                                    <option value="@doc.Number" @onclick="() => ToggleDocumentNumber(doc.Number)">
+                                        @doc.Number
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Ресурсы:</label>
+                            <select class="form-select" multiple>
+                                @foreach (var resource in Resources)
+                                {
+                                    <option value="@resource.Id" @onclick="() => ToggleResource(resource.Id)">
+                                        @resource.Name
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Единицы измерения:</label>
+                            <select class="form-select" multiple>
+                                @foreach (var unit in UnitsOfMeasurement)
+                                {
+                                    <option value="@unit.Id" @onclick="() => ToggleUnit(unit.Id)">
+                                        @unit.Name
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-12">
+                            <button class="btn btn-primary" @onclick="ApplyFilters">Применить</button>
+                            <button class="btn btn-secondary ms-2" @onclick="ClearFilters">Очистить</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+    </div>
+}
+else if (ErrorMessage != null)
+{
+    <div class="alert alert-danger">
+        @ErrorMessage
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Номер</th>
+                    <th>Клиент</th>
+                    <th>Дата</th>
+                    <th>Состояние</th>
+                    <th>Ресурсы</th>
+                    <th>Количество позиций</th>
+                    <th width="200">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (DocumentsList.Any())
+                {
+                    @foreach (var document in DocumentsList)
+                    {
+                        <tr>
+                            <td>@document.Number</td>
+                            <td>@(document.Client?.Name ?? "Неизвестный клиент")</td>
+                            <td>@document.Date.ToString("dd.MM.yyyy")</td>
+                            <td>
+                                <span class="badge @GetStateBadgeClass(document.State)">
+                                    @GetStateText(document.State)
+                                </span>
+                            </td>
+                            <td>
+                                @if (document.ShipmentResources.Any())
+                                {
+                                    <small>
+                                        @string.Join(", ", document.ShipmentResources.Take(2).Select(r => $"{r.Resource?.Name ?? "Неизвестный"} ({r.Quantity} {r.UnitOfMeasurement?.Name ?? ""})"))
+                                        @if (document.ShipmentResources.Count > 2)
+                                        {
+                                            <text>...</text>
+                                        }
+                                    </small>
+                                }
+                            </td>
+                            <td>@document.ShipmentResources.Count</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-outline-info" @onclick="() => ViewDocument(document)" title="Просмотр">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    
+                                    @if (document.State == DocumentState.Draft)
+                                    {
+                                        <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(document)" title="Редактировать">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-outline-success" @onclick="() => SignDocument(document.Id)" title="Подписать">
+                                            <i class="bi bi-check-circle"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" @onclick="() => DeleteDocument(document.Id)" title="Удалить">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    }
+                                    else if (document.State == DocumentState.Signed)
+                                    {
+                                        <button class="btn btn-outline-warning" @onclick="() => RevokeDocument(document.Id)" title="Отозвать">
+                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                        </button>
+                                    }
+                                    else if (document.State == DocumentState.Revoked)
+                                    {
+                                        <button class="btn btn-outline-danger" @onclick="() => DeleteDocument(document.Id)" title="Удалить">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">Нет данных для отображения</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- Create/Edit Modal -->
+@if (ShowModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(IsEditMode ? "Редактировать документ отгрузки" : "Создать документ отгрузки")</h5>
+                    <button type="button" class="btn-close" @onclick="HideModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">Номер документа *</label>
+                            <input type="text" class="form-control" @bind="CurrentDocument.Number" placeholder="О-001" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Дата документа *</label>
+                            <input type="date" class="form-control" @bind="CurrentDocument.Date" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Клиент *</label>
+                            <select class="form-select" @onchange="@((e) => CurrentDocument.ClientId = int.Parse(e.Value.ToString()))">
+                                <option value="0">Выберите клиента</option>
+                                @foreach (var client in Clients.Where(c => c.State == EntityState.Active))
+                                {
+                                    <option value="@client.Id" selected="@(CurrentDocument.ClientId == client.Id)">@client.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr />
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6>Ресурсы отгрузки</h6>
+                        <button type="button" class="btn btn-sm btn-success" @onclick="AddResource">
+                            <i class="bi bi-plus"></i> Добавить ресурс
+                        </button>
+                    </div>
+
+                    @if (CurrentDocument.ShipmentResources.Any())
+                    {
+                        @for (int i = 0; i < CurrentDocument.ShipmentResources.Count; i++)
+                        {
+                            var index = i; // Capture for closure
+                            var resource = CurrentDocument.ShipmentResources[index];
+                            
+                            <div class="row mb-2 p-2 border rounded">
+                                <div class="col-md-4">
+                                    <label class="form-label">Ресурс:</label>
+                                    <select class="form-select" @onchange="@((e) => resource.ResourceId = int.Parse(e.Value.ToString()))">
+                                        <option value="0">Выберите ресурс</option>
+                                        @foreach (var res in Resources.Where(r => r.State == EntityState.Active))
+                                        {
+                                            <option value="@res.Id" selected="@(resource.ResourceId == res.Id)">@res.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Единица измерения:</label>
+                                    <select class="form-select" @onchange="@((e) => resource.UnitOfMeasurementId = int.Parse(e.Value.ToString()))">
+                                        <option value="0">Выберите единицу</option>
+                                        @foreach (var unit in UnitsOfMeasurement.Where(u => u.State == EntityState.Active))
+                                        {
+                                            <option value="@unit.Id" selected="@(resource.UnitOfMeasurementId == unit.Id)">@unit.Name</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Количество:</label>
+                                    <input type="number" step="0.01" min="0.01" class="form-control" @bind="resource.Quantity" />
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveResource(index)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Внимание!</strong> Документ отгрузки не может быть пустым. Добавьте хотя бы один ресурс.
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Отмена</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveDocument" 
+                            disabled="@(string.IsNullOrWhiteSpace(CurrentDocument.Number) || CurrentDocument.ClientId == 0 || !CurrentDocument.ShipmentResources.Any())">
+                        Сохранить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- View Modal -->
+@if (ShowViewModal && ViewingDocument != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Документ отгрузки №@ViewingDocument.Number</h5>
+                    <button type="button" class="btn-close" @onclick="HideViewModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <strong>Номер:</strong> @ViewingDocument.Number
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Дата:</strong> @ViewingDocument.Date.ToString("dd.MM.yyyy")
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Состояние:</strong> 
+                            <span class="badge @GetStateBadgeClass(ViewingDocument.State)">
+                                @GetStateText(ViewingDocument.State)
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <strong>Клиент:</strong> @(ViewingDocument.Client?.Name ?? "Неизвестный клиент")
+                            @if (!string.IsNullOrEmpty(ViewingDocument.Client?.Address))
+                            {
+                                <br />
+                                <small class="text-muted">@ViewingDocument.Client.Address</small>
+                            }
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>Дата создания:</strong> @ViewingDocument.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Дата обновления:</strong> @ViewingDocument.UpdatedAt.ToString("dd.MM.yyyy HH:mm")
+                        </div>
+                    </div>
+
+                    <h6>Ресурсы отгрузки:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Ресурс</th>
+                                    <th>Единица измерения</th>
+                                    <th>Количество</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var resource in ViewingDocument.ShipmentResources)
+                                {
+                                    <tr>
+                                        <td>@(resource.Resource?.Name ?? "Неизвестный ресурс")</td>
+                                        <td>@(resource.UnitOfMeasurement?.Name ?? "Неизвестная единица")</td>
+                                        <td class="text-end">@resource.Quantity.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideViewModal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ShipmentDocument> DocumentsList = new();
+    private List<ShipmentDocument> AllDocuments = new();
+    private List<Resource> Resources = new();
+    private List<UnitOfMeasurement> UnitsOfMeasurement = new();
+    private List<ClientModel> Clients = new();
+    
+    private ShipmentDocument CurrentDocument = new();
+    private ShipmentDocument? ViewingDocument;
+    
+    private DocumentFilterDto Filter = new();
+    
+    private bool IsLoading = true;
+    private bool ShowModal = false;
+    private bool ShowViewModal = false;
+    private bool IsEditMode = false;
+    private bool ShowFilters = false;
+    private string? ErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+
+            var tasks = new[]
+            {
+                LoadDocuments(),
+                LoadResources(),
+                LoadUnitsOfMeasurement(),
+                LoadClients()
+            };
+
+            await Task.WhenAll(tasks);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка загрузки данных: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task LoadDocuments()
+    {
+        DocumentsList = (await ApiService.GetShipmentDocumentsAsync(Filter)).ToList();
+        AllDocuments = (await ApiService.GetShipmentDocumentsAsync()).ToList();
+    }
+
+    private async Task LoadResources()
+    {
+        Resources = (await ApiService.GetResourcesAsync()).ToList();
+    }
+
+    private async Task LoadUnitsOfMeasurement()
+    {
+        UnitsOfMeasurement = (await ApiService.GetUnitsOfMeasurementAsync()).ToList();
+    }
+
+    private async Task LoadClients()
+    {
+        Clients = (await ApiService.GetClientsAsync()).ToList();
+    }
+
+    private string GetStateBadgeClass(DocumentState state)
+    {
+        return state switch
+        {
+            DocumentState.Draft => "bg-secondary",
+            DocumentState.Signed => "bg-success",
+            DocumentState.Revoked => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetStateText(DocumentState state)
+    {
+        return state switch
+        {
+            DocumentState.Draft => "Черновик",
+            DocumentState.Signed => "Подписан",
+            DocumentState.Revoked => "Отозван",
+            _ => "Неизвестно"
+        };
+    }
+
+    private void ToggleFilters()
+    {
+        ShowFilters = !ShowFilters;
+    }
+
+    private void ToggleDocumentNumber(string number)
+    {
+        if (Filter.DocumentNumbers.Contains(number))
+            Filter.DocumentNumbers.Remove(number);
+        else
+            Filter.DocumentNumbers.Add(number);
+    }
+
+    private void ToggleResource(int resourceId)
+    {
+        if (Filter.ResourceIds.Contains(resourceId))
+            Filter.ResourceIds.Remove(resourceId);
+        else
+            Filter.ResourceIds.Add(resourceId);
+    }
+
+    private void ToggleUnit(int unitId)
+    {
+        if (Filter.UnitOfMeasurementIds.Contains(unitId))
+            Filter.UnitOfMeasurementIds.Remove(unitId);
+        else
+            Filter.UnitOfMeasurementIds.Add(unitId);
+    }
+
+    private async Task ApplyFilters()
+    {
+        await LoadDocuments();
+    }
+
+    private async Task ClearFilters()
+    {
+        Filter = new DocumentFilterDto();
+        await LoadDocuments();
+    }
+
+    private void ShowCreateModal()
+    {
+        CurrentDocument = new ShipmentDocument 
+        { 
+            Date = DateTime.Today,
+            ShipmentResources = new List<ShipmentResource>()
+        };
+        IsEditMode = false;
+        ShowModal = true;
+    }
+
+    private void ShowEditModal(ShipmentDocument document)
+    {
+        CurrentDocument = new ShipmentDocument
+        {
+            Id = document.Id,
+            Number = document.Number,
+            ClientId = document.ClientId,
+            Date = document.Date,
+            State = document.State,
+            CreatedAt = document.CreatedAt,
+            UpdatedAt = document.UpdatedAt,
+            ShipmentResources = document.ShipmentResources.Select(r => new ShipmentResource
+            {
+                Id = r.Id,
+                ResourceId = r.ResourceId,
+                UnitOfMeasurementId = r.UnitOfMeasurementId,
+                Quantity = r.Quantity
+            }).ToList()
+        };
+        IsEditMode = true;
+        ShowModal = true;
+    }
+
+    private void HideModal()
+    {
+        ShowModal = false;
+        CurrentDocument = new ShipmentDocument();
+    }
+
+    private void ViewDocument(ShipmentDocument document)
+    {
+        ViewingDocument = document;
+        ShowViewModal = true;
+    }
+
+    private void HideViewModal()
+    {
+        ShowViewModal = false;
+        ViewingDocument = null;
+    }
+
+    private void AddResource()
+    {
+        CurrentDocument.ShipmentResources.Add(new ShipmentResource 
+        { 
+            Quantity = 1.0m 
+        });
+    }
+
+    private void RemoveResource(int index)
+    {
+        CurrentDocument.ShipmentResources.RemoveAt(index);
+    }
+
+    private async Task SaveDocument()
+    {
+        try
+        {
+            if (IsEditMode)
+            {
+                await ApiService.UpdateShipmentDocumentAsync(CurrentDocument);
+            }
+            else
+            {
+                await ApiService.CreateShipmentDocumentAsync(CurrentDocument);
+            }
+
+            HideModal();
+            await LoadDocuments();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Ошибка сохранения: {ex.Message}";
+        }
+    }
+
+    private async Task SignDocument(int id)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Подписать документ? После подписания ресурсы будут списаны с баланса склада."))
+        {
+            try
+            {
+                await ApiService.SignShipmentDocumentAsync(id);
+                await LoadDocuments();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Ошибка подписания: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task RevokeDocument(int id)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Отозвать документ? Ресурсы будут возвращены на баланс склада."))
+        {
+            try
+            {
+                await ApiService.RevokeShipmentDocumentAsync(id);
+                await LoadDocuments();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Ошибка отзыва: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task DeleteDocument(int id)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", "Вы уверены, что хотите удалить этот документ?"))
+        {
+            try
+            {
+                await ApiService.DeleteShipmentDocumentAsync(id);
+                await LoadDocuments();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Ошибка удаления: {ex.Message}";
+            }
+        }
+    }
+}
