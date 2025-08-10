@@ -9,8 +9,9 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Ресурсы</h1>
-    <button class="btn btn-primary" @onclick="ShowCreateModal">
-        <i class="bi bi-plus-circle"></i> Добавить ресурс
+    <button class="btn btn-primary btn-lg" @onclick="ShowCreateModal">
+        <i class="bi bi-box-seam-fill me-2"></i> 
+        <strong>Добавить ресурс</strong>
     </button>
 </div>
 
@@ -56,24 +57,32 @@ else
                             <td>@resource.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
                             <td>@resource.UpdatedAt.ToString("dd.MM.yyyy HH:mm")</td>
                             <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(resource)">
-                                        <i class="bi bi-pencil"></i>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Действия с ресурсом">
+                                    <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(resource)" 
+                                            title="Редактировать ресурс" data-bs-toggle="tooltip">
+                                        <i class="bi bi-pencil-square me-1"></i>
+                                        <span class="d-none d-sm-inline">Изменить</span>
                                     </button>
                                     @if (resource.State == EntityState.Active)
                                     {
-                                        <button class="btn btn-outline-warning" @onclick="() => ArchiveResource(resource.Id)">
-                                            <i class="bi bi-archive"></i>
+                                        <button class="btn btn-outline-warning" @onclick="() => ArchiveResource(resource.Id)" 
+                                                title="Отправить в архив" data-bs-toggle="tooltip">
+                                            <i class="bi bi-archive me-1"></i>
+                                            <span class="d-none d-sm-inline">Архив</span>
                                         </button>
                                     }
                                     else
                                     {
-                                        <button class="btn btn-outline-info" @onclick="() => RestoreResource(resource.Id)">
-                                            <i class="bi bi-arrow-clockwise"></i>
+                                        <button class="btn btn-outline-success" @onclick="() => RestoreResource(resource.Id)" 
+                                                title="Восстановить из архива" data-bs-toggle="tooltip">
+                                            <i class="bi bi-arrow-clockwise me-1"></i>
+                                            <span class="d-none d-sm-inline">Восстановить</span>
                                         </button>
                                     }
-                                    <button class="btn btn-outline-danger" @onclick="() => DeleteResource(resource.Id)">
-                                        <i class="bi bi-trash"></i>
+                                    <button class="btn btn-outline-danger" @onclick="() => DeleteResource(resource.Id)" 
+                                            title="Удалить ресурс навсегда" data-bs-toggle="tooltip">
+                                        <i class="bi bi-trash3 me-1"></i>
+                                        <span class="d-none d-sm-inline">Удалить</span>
                                     </button>
                                 </div>
                             </td>
@@ -108,9 +117,12 @@ else
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Отмена</button>
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">
+                        <i class="bi bi-x-circle me-1"></i> Отмена
+                    </button>
                     <button type="button" class="btn btn-primary" @onclick="SaveResource" disabled="@(string.IsNullOrWhiteSpace(CurrentResource.Name))">
-                        Сохранить
+                        <i class="bi bi-check-circle me-1"></i> 
+                        <strong>@(IsEditMode ? "Обновить" : "Создать")</strong>
                     </button>
                 </div>
             </div>

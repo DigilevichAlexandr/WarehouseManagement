@@ -9,8 +9,9 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Документы поступления</h1>
-    <button class="btn btn-primary" @onclick="ShowCreateModal">
-        <i class="bi bi-plus-circle"></i> Создать документ поступления
+    <button class="btn btn-primary btn-lg" @onclick="ShowCreateModal">
+        <i class="bi bi-file-earmark-plus-fill me-2"></i> 
+        <strong>Создать документ поступления</strong>
     </button>
 </div>
 
@@ -76,8 +77,12 @@
                     </div>
                     <div class="row mt-3">
                         <div class="col-md-12">
-                            <button class="btn btn-primary" @onclick="ApplyFilters">Применить</button>
-                            <button class="btn btn-secondary ms-2" @onclick="ClearFilters">Очистить</button>
+                            <button class="btn btn-primary" @onclick="ApplyFilters">
+                                <i class="bi bi-funnel-fill me-1"></i> Применить фильтры
+                            </button>
+                            <button class="btn btn-secondary ms-2" @onclick="ClearFilters">
+                                <i class="bi bi-x-circle me-1"></i> Очистить фильтры
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -141,15 +146,21 @@ else
                             <td>@document.ReceiptResources.Count</td>
                             <td>@document.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
                             <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-outline-info" @onclick="() => ViewDocument(document)" title="Просмотр">
-                                        <i class="bi bi-eye"></i>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Действия с документом">
+                                    <button class="btn btn-outline-info" @onclick="() => ViewDocument(document)" 
+                                            title="Просмотреть детали документа" data-bs-toggle="tooltip">
+                                        <i class="bi bi-eye me-1"></i>
+                                        <span class="d-none d-sm-inline">Просмотр</span>
                                     </button>
-                                    <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(document)" title="Редактировать">
-                                        <i class="bi bi-pencil"></i>
+                                    <button class="btn btn-outline-primary" @onclick="() => ShowEditModal(document)" 
+                                            title="Редактировать документ" data-bs-toggle="tooltip">
+                                        <i class="bi bi-pencil-square me-1"></i>
+                                        <span class="d-none d-sm-inline">Изменить</span>
                                     </button>
-                                    <button class="btn btn-outline-danger" @onclick="() => DeleteDocument(document.Id)" title="Удалить">
-                                        <i class="bi bi-trash"></i>
+                                    <button class="btn btn-outline-danger" @onclick="() => DeleteDocument(document.Id)" 
+                                            title="Удалить документ (баланс будет пересчитан)" data-bs-toggle="tooltip">
+                                        <i class="bi bi-trash3 me-1"></i>
+                                        <span class="d-none d-sm-inline">Удалить</span>
                                     </button>
                                 </div>
                             </td>
@@ -194,7 +205,7 @@ else
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6>Ресурсы поступления</h6>
                         <button type="button" class="btn btn-sm btn-success" @onclick="AddResource">
-                            <i class="bi bi-plus"></i> Добавить ресурс
+                            <i class="bi bi-plus-circle me-1"></i> Добавить ресурс
                         </button>
                     </div>
 
@@ -231,8 +242,10 @@ else
                                     <input type="number" step="0.01" min="0.01" class="form-control" @bind="resource.Quantity" />
                                 </div>
                                 <div class="col-md-2 d-flex align-items-end">
-                                    <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoveResource(index)">
-                                        <i class="bi bi-trash"></i>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveResource(index)" 
+                                            title="Удалить ресурс из документа">
+                                        <i class="bi bi-trash me-1"></i>
+                                        <span class="d-none d-sm-inline">Убрать</span>
                                     </button>
                                 </div>
                             </div>
@@ -246,9 +259,12 @@ else
                     }
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Отмена</button>
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">
+                        <i class="bi bi-x-circle me-1"></i> Отмена
+                    </button>
                     <button type="button" class="btn btn-primary" @onclick="SaveDocument" disabled="@(string.IsNullOrWhiteSpace(CurrentDocument.Number))">
-                        Сохранить
+                        <i class="bi bi-check-circle me-1"></i> 
+                        <strong>@(IsEditMode ? "Обновить" : "Создать")</strong>
                     </button>
                 </div>
             </div>
@@ -315,7 +331,9 @@ else
                     }
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="HideViewModal">Закрыть</button>
+                    <button type="button" class="btn btn-secondary" @onclick="HideViewModal">
+                        <i class="bi bi-x-circle me-1"></i> Закрыть
+                    </button>
                 </div>
             </div>
         </div>

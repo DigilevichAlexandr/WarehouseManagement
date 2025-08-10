@@ -1,4 +1,6 @@
 ﻿@inherits LayoutComponentBase
+@inject IJSRuntime JSRuntime
+
 <div class="page">
     <div class="sidebar">
         <NavMenu />
@@ -14,3 +16,21 @@
         </article>
     </main>
 </div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Инициализация tooltip'ов через внешний JavaScript файл
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("warehouseApp.initializeTooltips");
+            }
+            catch
+            {
+                // Если JavaScript не загружен, игнорируем ошибку
+            }
+        }
+    }
+}
